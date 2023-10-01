@@ -9,10 +9,12 @@ import datetime
 
 def short_press():
     m = 30    # mins for timer
+    print("Short press detected, in short_press(), line 12")
     total_seconds = m * 60
     return total_seconds
 
 def long_press():
+    print("Long press detected, in long_press(), line 17")
     total_seconds = 0
     return total_seconds
 
@@ -22,9 +24,9 @@ def main():
     total_seconds = 0
     relay.off()
     button = Button(air_compressor_pin, bounce_time=0.1)
-
+#    button.was_held = False        # might not need this, keeping it for now 10/1/23
     button.when_pressed = short_press()
-    button.long_press = long_press()
+    button.when_held = long_press()
 
     while total_seconds > 0:
         if relay is False:
@@ -36,7 +38,9 @@ def main():
         total_seconds -= 1
 
     relay = False
-    time.sleep(1)
+    while True:
+        print("In while True loop, line 42")
+        time.sleep(1)
 
 if __name__ == '__main__':
     main()
