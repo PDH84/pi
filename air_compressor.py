@@ -1,46 +1,103 @@
 """
-Generally what I want but need to figure out and clean up the when_pressed
-and long_press stuff.
+air_compressor.py
+
+Program works, short button push (less than 2 seconds) turns on relay
+and starts a timer, long press (2 seconds or more) turns off timer.
+10/07/23
+Added log and keyboard interupt, untested. 11/27/23
 """
-from gpiozero import Button, LED
 import time
-import datetime
+import sys
+from gpiozero import Button, LED
+
+
+def long_press():
+    print("Button was long pressed.")
+    log = open('/home/pi/automation/basement_log.txt', 'a+')
+    log.write('{0},{1},Long press detected.\r\n'.
+              format(time.strftime('%m/%d/%y'), time.strftime('%H:%M')))
+    log.close()
+    global timer
+    timer = 0
 
 
 def short_press():
-    m = 30    # mins for timer
-    print("Short press detected, in short_press(), line 12")
-    total_seconds = m * 60
-    return total_seconds
+    print("Button was short pressed.")
+    log = open('/home/pi/automation/basement_log.txt', 'a+')
+    log.write('{0},{1},Short press detected.\r\n'.
+              format(time.strftime('%m/%d/%y'), time.strftime('%H:%M')))
+    log.close()
+    global timer
+    m = 30      # minutes for the timer
+    timer = m * 60
 
-def long_press():
-    print("Long press detected, in long_press(), line 17")
-    total_seconds = 0
-    return total_seconds
+
+def button_pressed():
+    global tstamp1
+    tstamp1 = time.time()
+
+
+def button_released():
+    global tstamp1
+    global tstamp2
+    tstamp2 = time.time()
+
+    td = tstamp2 - tstamp1
+
+    if td >= long_press_time:
+        long_press()
+    else:
+        short_press()
+
+
+def status(relay_status, timer):
+    if relay_status:
+        print("The air compressor is currently on and the timer "
+              "is at: ", str(timer), " minutes.")
+    else:
+        print("The air compressor is currently off.")
+
+
+tstamp1 = time.time()
+tstamp2 = time.time()
+button_pin = 4
+button = Button(button_pin, bounce_time=0.05)
+long_press_time = 2
+relay_pin = 17      # pin for the relay
+relay = LED(relay_pin)
+relay.off()
+timer = 0
+relay_status = False
+
 
 def main():
-    relay = LED(23)
-    air_compressor_pin =  # pin for button
-    total_seconds = 0
-    relay.off()
-    button = Button(air_compressor_pin, bounce_time=0.1)
-#    button.was_held = False        # might not need this, keeping it for now 10/1/23
-    button.when_pressed = short_press()
-    button.when_held = long_press()
+    global relay_status
 
-    while total_seconds > 0:
-        if relay is False:
-            relay = True
-        # Timer represents time left on countdown
-        timer = datetime.timedelta(seconds=total_seconds)
-        print(timer, end="\r")
-        time.sleep(1)
-        total_seconds -= 1
-
-    relay = False
     while True:
-        print("In while True loop, line 42")
-        time.sleep(1)
+        button.when_pressed = button_pressed
+        button.when_released = button_released
+        if timer > 0:
+            relay.on()
+            relay_status = True
+            log = open('/home/pi/automation/basement_log.txt', 'a+')
+            log.write('{0},{1},Relay turned on.\r\n'.format
+                      (time.strftime('%m/%d/%y'), time.strftime('%H:%M')))
+            log.close()
+        else:
+            relay.off()
+            relay_status = False
+            log = open('/home/pi/automation/basement_log.txt', 'a+')
+            log.write('{0},{1},Relay turned off.\r\n'.format
+                      (time.strftime('%m/%d/%y'), time.strftime('%H:%M')))
+            log.close()
+
+        try:
+            stdin = sys.stdin.read()
+            if "status" in stdin:
+                status(relay_status, timer)
+        except:
+            pass
+
 
 if __name__ == '__main__':
     main()
